@@ -156,24 +156,73 @@
             <div class="subject-list-header">
               <div>
                 <h3>Your Subjects</h3>
-                <span id="subjectCountText" class="subject-count-label">0 subjects added</span>
+                <div style="display:flex;flex-direction:column;gap:0.25rem;">
+                  <span id="subjectCountText" class="subject-count-label">0 subjects added</span>
+                  <span id="resultCountText" class="result-count" aria-live="polite">Showing 0 of 0 subjects</span>
+                </div>
               </div>
               <div class="subject-toolbar" aria-label="Subject management controls">
-                <label class="search-field" for="subjectSearch">
-                  <span class="sr-only">Search subjects</span>
-                  <input id="subjectSearch" type="search" placeholder="Search subjects" aria-label="Search subjects" />
-                </label>
-                <label class="sort-field" for="subjectSort">
-                  <span class="sr-only">Sort subjects</span>
-                  <select id="subjectSort" aria-label="Sort subjects">
-                    <option value="recent">Most Recent</option>
-                    <option value="name-asc">Name: A–Z</option>
-                    <option value="name-desc">Name: Z–A</option>
-                    <option value="credits-desc">Credits: High to Low</option>
-                    <option value="grade-desc">Grade: High to Low</option>
-                  </select>
-                </label>
-                <button id="deleteAllBtn" class="danger-button" type="button">Delete All</button>
+                <div class="subject-controls">
+                  <label for="subjectSearch" class="search-field">
+                    <span class="sr-only">Search subjects</span>
+                    <input id="subjectSearch" type="search" placeholder="Search by subject name..." aria-label="Search subjects" />
+                    <button id="clearSearchBtn" type="button" aria-label="Clear subject search" style="display:none;">×</button>
+                  </label>
+
+                  <label class="filter-field" for="gradeFilter">
+                    <span class="sr-only">Filter by grade</span>
+                    <select id="gradeFilter" aria-label="Filter by grade">
+                      <option value="all">All Grades</option>
+                      <option value="A+">A+</option>
+                      <option value="A">A</option>
+                      <option value="B+">B+</option>
+                      <option value="B">B</option>
+                      <option value="C+">C+</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
+                      <option value="F">F</option>
+                    </select>
+                  </label>
+
+                  <label class="filter-field" for="statusFilter">
+                    <span class="sr-only">Filter by status</span>
+                    <select id="statusFilter" aria-label="Filter by status">
+                      <option value="all">All</option>
+                      <option value="passed">Passed</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                  </label>
+
+                  <label class="filter-field" for="creditsFilter">
+                    <span class="sr-only">Filter by credits</span>
+                    <select id="creditsFilter" aria-label="Filter by credits">
+                      <option value="all">All Credits</option>
+                    </select>
+                  </label>
+
+                  <label class="sort-field" for="viewSort">
+                    <span class="sr-only">Sort subjects</span>
+                    <select id="viewSort" aria-label="Sort subjects">
+                      <option value="original">Original Order</option>
+                      <option value="name">Subject Name</option>
+                      <option value="credits">Credits</option>
+                      <option value="gradePoint">Grade Point</option>
+                      <option value="qualityPoints">Quality Points</option>
+                    </select>
+                  </label>
+
+                  <label class="sort-field" for="sortDirection">
+                    <select id="sortDirection" aria-label="Sort direction">
+                      <option value="desc">Desc</option>
+                      <option value="asc">Asc</option>
+                    </select>
+                  </label>
+
+                  <button id="clearFiltersBtn" class="secondary-action-button" type="button">Clear Filters</button>
+                  <button id="resetViewBtn" class="secondary-button" type="button">Reset View</button>
+                  <button id="deleteAllBtn" class="danger-button" type="button">Delete All</button>
+                </div>
+                <div id="activeFilters" class="active-filters" aria-live="polite"></div>
               </div>
             </div>
             <div id="subjectList" class="subject-list" aria-live="polite"></div>

@@ -1116,6 +1116,70 @@ p {
   }
 }
 
+/* =========================================
+   PHASE 7 — SUBJECT CONTROLS
+   ========================================= */
+.subject-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.subject-controls .search-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.subject-controls input[type="search"] {
+  min-width: 220px;
+  padding-right: 2rem;
+}
+
+.subject-controls .filter-field select,
+.subject-controls .sort-field select {
+  min-width: 120px;
+  height: 44px;
+  padding: 0.5rem;
+}
+
+.result-count {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.active-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.filter-chip {
+  background: rgba(220,38,38,0.06);
+  border: 1px solid rgba(220,38,38,0.12);
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .subject-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .subject-controls .search-field {
+    width: 100%;
+  }
+
+  .subject-controls .filter-field select,
+  .subject-controls .sort-field select {
+    width: 100%;
+  }
+}
+
 .result-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);

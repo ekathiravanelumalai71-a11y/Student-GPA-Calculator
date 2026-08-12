@@ -74,7 +74,161 @@ const elements = {
   subjectPerformanceContainer: document.getElementById("subjectPerformance"),
   failedSubjectsContainer: document.getElementById("failedSubjects"),
   formulaExplanationContainer: document.getElementById("formulaExplanation")
+  ,
+  // Phase 7 controls
+  clearSearchBtn: document.getElementById("clearSearchBtn"),
+  gradeFilter: document.getElementById("gradeFilter"),
+  statusFilter: document.getElementById("statusFilter"),
+  creditsFilter: document.getElementById("creditsFilter"),
+  viewSort: document.getElementById("viewSort"),
+  sortDirection: document.getElementById("sortDirection"),
+  clearFiltersBtn: document.getElementById("clearFiltersBtn"),
+  resetViewBtn: document.getElementById("resetViewBtn"),
+  resultCountText: document.getElementById("resultCountText"),
+  activeFiltersContainer: document.getElementById("activeFilters")
 };
+
+/* -------------------- View State (Phase 7) -------------------- */
+const viewState = {
+  search: "",
+  grade: "all",
+  status: "all",
+  credits: "all",
+  sortBy: "original",
+  sortDirection: "desc"
+};
+
+function formatSubjectCount(n) {
+  return n === 1 ? "1 subject" : `${n} subjects`;
+}
+
+function isPassingGradeByValue(grade) {
+  // Reuse existing grade mapping: everything except 'F' is passing
+  if (!grade) return false;
+  return String(grade) !== "F" && Object.prototype.hasOwnProperty.call(GRADE_POINTS, grade);
+}
+
+/* -------------------- Display Pipeline -------------------- */
+function applySearchFilter(list, search) {
+  const q = String(search || "").trim().toLowerCase();
+  if (!q) return list;
+  return list.filter((s) => String(s.name || "").toLowerCase().includes(q));
+}
+
+function applyGradeFilter(list, grade) {
+  if (!grade || grade === "all") return list;
+  return list.filter((s) => String(s.grade) === String(grade));
+}
+
+function applyStatusFilter(list, status) {
+  if (!status || status === "all") return list;
+  if (status === "passed") {
+    return list.filter((s) => isPassingGradeByValue(s.grade));
+  }
+  if (status === "failed") {
+    return list.filter((s) => String(s.grade) === "F");
+  }
+  return list;
+}
+
+function applyCreditsFilter(list, credits) {
+  if (!credits || credits === "all") return list;
+  const cnum = Number(credits);
+  if (!Number.isFinite(cnum)) return list;
+  return list.filter((s) => Number(s.credits) === cnum);
+}
+
+function applySort(list, sortBy, direction) {
+  const dir = direction === "asc" ? 1 : -1;
+  const copy = [...list];
+
+  switch (sortBy) {
+    case "name":
+      return copy.sort((a, b) => dir * (String(a.name).toLowerCase().localeCompare(String(b.name).toLowerCase())));
+    case "credits":
+      return copy.sort((a, b) => dir * (Number(a.credits) - Number(b.credits)) || String(a.name).localeCompare(b.name));
+    case "gradePoint":
+      return copy.sort((a, b) => {
+        const ag = getGradePoint(a.grade) ?? -999;
+        const bg = getGradePoint(b.grade) ?? -999;
+        return dir * (ag - bg) || String(a.name).localeCompare(b.name);
+      });
+    case "qualityPoints":
+      return copy.sort((a, b) => {
+        const aq = calculateQualityPoints(Number(a.credits) || 0, getGradePoint(a.grade) || 0);
+        const bq = calculateQualityPoints(Number(b.credits) || 0, getGradePoint(b.grade) || 0);
+        return dir * (aq - bq) || String(a.name).localeCompare(b.name);
+      });
+    case "original":
+    default:
+      return copy; // preserve original order from state.subjects copy
+  }
+}
+
+function getDisplayedSubjects() {
+  if (!Array.isArray(state.subjects)) return [];
+  let result = [...state.subjects];
+  result = applySearchFilter(result, viewState.search);
+  result = applyGradeFilter(result, viewState.grade);
+  result = applyStatusFilter(result, viewState.status);
+  result = applyCreditsFilter(result, viewState.credits);
+  result = applySort(result, viewState.sortBy, viewState.sortDirection);
+  return result;
+}
+
+function updateCreditOptions() {
+  if (!elements.creditsFilter) return;
+  const unique = Array.from(new Set(state.subjects.map((s) => Number(s.credits)).filter((n) => Number.isFinite(n)))).sort((a, b) => a - b);
+  elements.creditsFilter.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value = "all";
+  optAll.textContent = "All Credits";
+  elements.creditsFilter.appendChild(optAll);
+  unique.forEach((c) => {
+    const o = document.createElement("option");
+    o.value = String(c);
+    o.textContent = `${c} Credit${c === 1 ? "" : "s"}`;
+    elements.creditsFilter.appendChild(o);
+  });
+}
+
+function renderActiveFilters() {
+  if (!elements.activeFiltersContainer) return;
+  const container = elements.activeFiltersContainer;
+  container.innerHTML = "";
+  const chips = [];
+  if (viewState.search) chips.push({ label: `Search: "${viewState.search}"`, key: "search" });
+  if (viewState.grade && viewState.grade !== "all") chips.push({ label: `Grade: ${viewState.grade}`, key: "grade" });
+  if (viewState.status && viewState.status !== "all") chips.push({ label: `Status: ${viewState.status}`, key: "status" });
+  if (viewState.credits && viewState.credits !== "all") chips.push({ label: `Credits: ${viewState.credits}`, key: "credits" });
+
+  chips.forEach((c) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "filter-chip";
+    chip.textContent = c.label + " ×";
+    chip.addEventListener("click", () => {
+      if (c.key === "search") {
+        viewState.search = "";
+        if (elements.subjectSearch) elements.subjectSearch.value = "";
+      }
+      if (c.key === "grade") {
+        viewState.grade = "all";
+        if (elements.gradeFilter) elements.gradeFilter.value = "all";
+      }
+      if (c.key === "status") {
+        viewState.status = "all";
+        if (elements.statusFilter) elements.statusFilter.value = "all";
+      }
+      if (c.key === "credits") {
+        viewState.credits = "all";
+        if (elements.creditsFilter) elements.creditsFilter.value = "all";
+      }
+      renderSubjects();
+    });
+    container.appendChild(chip);
+  });
+}
 
 /* -------------------- Analytics Helpers (Phase 6) -------------------- */
 
@@ -935,14 +1089,8 @@ function sortSubjects() {
 }
 
 function getVisibleSubjects() {
-  const searchText = state.searchTerm.trim().toLowerCase();
-  const sortedSubjects = sortSubjects();
-
-  if (!searchText) {
-    return sortedSubjects;
-  }
-
-  return sortedSubjects.filter((subject) => subject.name.toLowerCase().includes(searchText));
+  // Backwards-compatible alias for the Phase 7 display pipeline
+  return getDisplayedSubjects();
 }
 
 function updateAddButtonState() {
@@ -961,28 +1109,41 @@ function renderSubjects() {
   if (!elements.subjectList) {
     return;
   }
-
-  const visibleSubjects = getVisibleSubjects();
+  const visibleSubjects = getDisplayedSubjects();
   elements.subjectList.innerHTML = "";
-
   if (visibleSubjects.length === 0) {
     const emptyState = document.createElement("div");
     emptyState.className = "empty-subject-list";
 
     const title = document.createElement("strong");
-    title.textContent = state.searchTerm.trim()
-      ? "No matching subjects found"
-      : "No subjects added yet";
+    // Distinguish between no subjects and no matches/filters
+    const totalSubjects = state.subjects.length;
+    if (totalSubjects === 0) {
+      title.textContent = "No subjects added yet";
+    } else if (viewState.search && !viewState.grade && !viewState.status && !viewState.credits) {
+      title.textContent = "No matching subjects found";
+    } else if (viewState.search || viewState.grade !== "all" || viewState.status !== "all" || viewState.credits !== "all") {
+      title.textContent = "No subjects match the selected filters";
+    } else {
+      title.textContent = "No subjects available";
+    }
 
     const message = document.createElement("span");
-    message.textContent = state.searchTerm.trim()
-      ? "Try another search term or clear the filter."
-      : "Add your first subject using the form above.";
+    if (totalSubjects === 0) {
+      message.textContent = "Add your first subject using the form above.";
+    } else {
+      message.textContent = "Try adjusting your search or clearing filters.";
+    }
 
     emptyState.appendChild(title);
     emptyState.appendChild(message);
     elements.subjectList.appendChild(emptyState);
     updateSummary();
+    // update result count and active filters
+    if (elements.resultCountText) {
+      elements.resultCountText.textContent = `Showing 0 of ${totalSubjects} subjects`;
+    }
+    renderActiveFilters();
     return;
   }
 
@@ -1039,6 +1200,11 @@ function renderSubjects() {
   });
 
   updateSummary();
+  // update result count and active filters
+  if (elements.resultCountText) {
+    elements.resultCountText.textContent = `Showing ${visibleSubjects.length} of ${state.subjects.length} subjects`;
+  }
+  renderActiveFilters();
 }
 
 function hideToast() {
@@ -1145,6 +1311,7 @@ function addSubject() {
 
   renderSubjects();
   updateCalculator();
+  updateCreditOptions();
   resetFormState();
   setStatusMessage("✓ Subject added successfully.", "info");
   showToast(`✓ ${newSubject.name} added successfully`);
@@ -1208,6 +1375,7 @@ function updateSubject() {
 
   renderSubjects();
   updateCalculator();
+  updateCreditOptions();
   resetFormState();
   setStatusMessage("✓ Subject updated successfully.", "info");
   showToast(`✓ ${subjectName} updated successfully`);
@@ -1287,6 +1455,7 @@ function deleteSubject(subjectId) {
 
     renderSubjects();
     updateCalculator();
+    updateCreditOptions();
     setStatusMessage("✓ Subject deleted successfully.", "info");
     showToast(`✓ ${deletedSubject.name} deleted`, () => undoDelete());
   });
@@ -1311,6 +1480,8 @@ function deleteAllSubjects() {
     renderSubjects();
     updateCalculator();
     resetFormState();
+    updateCreditOptions();
+    resetView();
     setStatusMessage("✓ All subjects deleted successfully.", "info");
     showToast("✓ All subjects deleted", () => undoDelete());
   });
@@ -1332,6 +1503,7 @@ function undoDelete() {
   state.lastDeletedState = null;
   renderSubjects();
   updateCalculator();
+  updateCreditOptions();
   setStatusMessage("✓ Last deletion restored.", "info");
 }
 
@@ -1354,12 +1526,14 @@ function handleSubjectListClick(event) {
 }
 
 function searchSubjects(value) {
-  state.searchTerm = value;
+  viewState.search = value;
+  if (elements.subjectSearch) elements.subjectSearch.value = value;
   renderSubjects();
 }
 
 function sortList(value) {
-  state.sortBy = value;
+  viewState.sortBy = value;
+  if (elements.viewSort) elements.viewSort.value = value;
   renderSubjects();
 }
 
@@ -1386,15 +1560,77 @@ function setupEventListeners() {
     elements.subjectList.addEventListener("click", handleSubjectListClick);
   }
 
+  // Phase 7: Search & controls
   if (elements.subjectSearch) {
     elements.subjectSearch.addEventListener("input", (event) => {
-      searchSubjects(event.target.value);
+      viewState.search = event.target.value;
+      if (elements.clearSearchBtn) {
+        elements.clearSearchBtn.style.display = viewState.search ? "inline-block" : "none";
+      }
+      renderSubjects();
     });
   }
 
-  if (elements.subjectSort) {
-    elements.subjectSort.addEventListener("change", (event) => {
-      sortList(event.target.value);
+  if (elements.clearSearchBtn) {
+    elements.clearSearchBtn.addEventListener("click", () => {
+      viewState.search = "";
+      if (elements.subjectSearch) elements.subjectSearch.value = "";
+      elements.clearSearchBtn.style.display = "none";
+      renderSubjects();
+    });
+  }
+
+  if (elements.gradeFilter) {
+    elements.gradeFilter.addEventListener("change", (e) => {
+      viewState.grade = e.target.value;
+      renderSubjects();
+    });
+  }
+
+  if (elements.statusFilter) {
+    elements.statusFilter.addEventListener("change", (e) => {
+      viewState.status = e.target.value;
+      renderSubjects();
+    });
+  }
+
+  if (elements.creditsFilter) {
+    elements.creditsFilter.addEventListener("change", (e) => {
+      viewState.credits = e.target.value;
+      renderSubjects();
+    });
+  }
+
+  if (elements.viewSort) {
+    elements.viewSort.addEventListener("change", (e) => {
+      viewState.sortBy = e.target.value;
+      renderSubjects();
+    });
+  }
+
+  if (elements.sortDirection) {
+    elements.sortDirection.addEventListener("change", (e) => {
+      viewState.sortDirection = e.target.value;
+      renderSubjects();
+    });
+  }
+
+  if (elements.clearFiltersBtn) {
+    elements.clearFiltersBtn.addEventListener("click", () => {
+      // Clear dropdown filters but keep search
+      viewState.grade = "all";
+      viewState.status = "all";
+      viewState.credits = "all";
+      if (elements.gradeFilter) elements.gradeFilter.value = "all";
+      if (elements.statusFilter) elements.statusFilter.value = "all";
+      if (elements.creditsFilter) elements.creditsFilter.value = "all";
+      renderSubjects();
+    });
+  }
+
+  if (elements.resetViewBtn) {
+    elements.resetViewBtn.addEventListener("click", () => {
+      resetView();
     });
   }
 
@@ -1454,8 +1690,26 @@ function initializeApp() {
   updateAddButtonState();
   renderSubjects();
   updateCalculator();
+  updateCreditOptions();
   setStatusMessage("Add your subject details to get started.", "info");
   setupEventListeners();
 }
 
 initializeApp();
+
+function resetView() {
+  viewState.search = "";
+  viewState.grade = "all";
+  viewState.status = "all";
+  viewState.credits = "all";
+  viewState.sortBy = "original";
+  viewState.sortDirection = "desc";
+  if (elements.subjectSearch) elements.subjectSearch.value = "";
+  if (elements.gradeFilter) elements.gradeFilter.value = "all";
+  if (elements.statusFilter) elements.statusFilter.value = "all";
+  if (elements.creditsFilter) elements.creditsFilter.value = "all";
+  if (elements.viewSort) elements.viewSort.value = "original";
+  if (elements.sortDirection) elements.sortDirection.value = "desc";
+  if (elements.clearSearchBtn) elements.clearSearchBtn.style.display = "none";
+  renderSubjects();
+}
