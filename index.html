@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A simple and responsive Student GPA Calculator."
+    />
+    <title>Student GPA Calculator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a href="#home" class="brand" aria-label="Student GPA Calculator home">
+          <span class="brand-mark" aria-hidden="true">
+            <span class="cap-top"></span>
+            <span class="cap-base"></span>
+          </span>
+          <span class="brand-text">GPA Calculator</span>
+        </a>
+
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="#home">Home</a>
+          <a href="#calculator">Calculator</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="home">
+      <section class="hero">
+        <div class="container hero-content">
+          <div class="hero-copy">
+            <p class="eyebrow">STUDENT PRODUCTIVITY TOOL</p>
+            <h1>
+              Calculate Your GPA
+              <span>With Confidence.</span>
+            </h1>
+            <p class="hero-description">
+              A simple and intuitive GPA calculator designed to help students
+              organize their academic results.
+            </p>
+          </div>
+
+          <div class="hero-visual" aria-label="GPA preview illustration">
+            <div class="hero-preview">
+              <div class="preview-header">
+                <span>GPA Overview</span>
+                <span class="preview-tag">Preview</span>
+              </div>
+              <div class="preview-score">8.72</div>
+              <p class="preview-label">Current GPA</p>
+              <div class="preview-bar" aria-hidden="true">
+                <span></span>
+              </div>
+              <div class="preview-meta">
+                <span>4 Subjects</span>
+                <span>16 Credits</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="calculator" class="calculator-section">
+        <div class="container calculator-shell">
+          <div class="calculator-card">
+            <div class="section-header">
+              <h2>GPA Calculator</h2>
+              <p>Enter your subject details to calculate your academic performance.</p>
+            </div>
+
+            <form id="gpaForm" class="gpa-form" novalidate>
+              <div class="subject-fields" aria-label="Subject details row">
+                <div class="form-group subject-name-field">
+                  <label for="subjectName">Subject Name</label>
+                  <input
+                    id="subjectName"
+                    name="subjectName"
+                    type="text"
+                    placeholder="e.g. Mathematics"
+                    aria-label="Subject name"
+                    aria-describedby="subjectNameError"
+                    required
+                  />
+                  <small id="subjectNameError" class="form-error" aria-live="polite"></small>
+                </div>
+
+                <div class="form-group credits-field">
+                  <label for="credits">Credits</label>
+                  <input
+                    id="credits"
+                    name="credits"
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="1"
+                    placeholder="e.g. 4"
+                    aria-label="Credits"
+                    aria-describedby="creditsError"
+                  />
+                  <small id="creditsError" class="form-error" aria-live="polite"></small>
+                </div>
+
+                <div class="form-group grade-field">
+                  <label for="grade">Grade</label>
+                  <select id="grade" name="grade" aria-label="Select grade" aria-describedby="gradeError" required>
+                    <option value="">Select Grade</option>
+                    <option value="A+">A+</option>
+                    <option value="A">A</option>
+                    <option value="B+">B+</option>
+                    <option value="B">B</option>
+                    <option value="C+">C+</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                    <option value="F">F</option>
+                  </select>
+                  <small id="gradeError" class="form-error" aria-live="polite"></small>
+                </div>
+              </div>
+
+              <div class="action-row">
+                <button id="addSubjectBtn" class="secondary-button" type="submit">
+                  + Add Subject
+                </button>
+                <button id="cancelEditBtn" class="secondary-action-button" type="button" style="display: none; margin-left: 0.75rem;">
+                  Cancel Edit
+                </button>
+              </div>
+
+              <button id="calculateBtn" class="primary-button" type="button">
+                Calculate GPA
+              </button>
+
+              <p id="statusMessage" class="form-status" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="results" aria-live="polite">
+        <div class="container result-container">
+          <div class="result-top">
+            <h2>Your GPA Overview</h2>
+            <p>Your results will appear here after calculation.</p>
+          </div>
+
+          <div class="subject-list-panel">
+            <div class="subject-list-header">
+              <div>
+                <h3>Your Subjects</h3>
+                <span id="subjectCountText" class="subject-count-label">0 subjects added</span>
+              </div>
+              <div class="subject-toolbar" aria-label="Subject management controls">
+                <label class="search-field" for="subjectSearch">
+                  <span class="sr-only">Search subjects</span>
+                  <input id="subjectSearch" type="search" placeholder="Search subjects" aria-label="Search subjects" />
+                </label>
+                <label class="sort-field" for="subjectSort">
+                  <span class="sr-only">Sort subjects</span>
+                  <select id="subjectSort" aria-label="Sort subjects">
+                    <option value="recent">Most Recent</option>
+                    <option value="name-asc">Name: A–Z</option>
+                    <option value="name-desc">Name: Z–A</option>
+                    <option value="credits-desc">Credits: High to Low</option>
+                    <option value="grade-desc">Grade: High to Low</option>
+                  </select>
+                </label>
+                <button id="deleteAllBtn" class="danger-button" type="button">Delete All</button>
+              </div>
+            </div>
+            <div id="subjectList" class="subject-list" aria-live="polite"></div>
+          </div>
+
+          <div class="result-grid">
+            <article class="result-card result-card-primary">
+              <p class="card-label">GPA</p>
+              <strong id="gpaValue" class="result-value">0.00</strong>
+              <span class="mini-text">Current GPA</span>
+            </article>
+
+            <article class="result-card">
+              <p class="card-label">Subjects</p>
+              <strong id="totalSubjectsValue" class="result-value small">0</strong>
+            </article>
+
+            <article class="result-card">
+              <p class="card-label">Total Credits</p>
+              <strong id="totalCreditsValue" class="result-value small">0</strong>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <div class="footer-brand">
+          <a href="#home" class="brand footer-brand-link" aria-label="Student GPA Calculator home">
+            <span class="brand-mark" aria-hidden="true">
+              <span class="cap-top"></span>
+              <span class="cap-base"></span>
+            </span>
+            <span class="brand-text">GPA Calculator</span>
+          </a>
+          <p>A simple tool for students to track and understand their academic progress.</p>
+        </div>
+
+        <div class="footer-links">
+          <h3>Quick Links</h3>
+          <ul>
+            <li><a href="#home">Home</a></li>
+            <li><a href="#calculator">Calculator</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="container copyright">
+        <p>© 2026 Student GPA Calculator</p>
+      </div>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <div id="modalOverlay" class="modal-overlay" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <h3 id="modalTitle">Delete Subject</h3>
+        <p id="modalMessage">Are you sure you want to proceed?</p>
+        <div class="modal-actions">
+          <button id="modalCancelBtn" class="modal-cancel-button" type="button">Cancel</button>
+          <button id="modalConfirmBtn" class="modal-confirm-button" type="button">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/script.js"></script>
+  </body>
+</html>
