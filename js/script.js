@@ -67,7 +67,349 @@ const elements = {
   modalConfirmButton: document.getElementById("modalConfirmBtn"),
   modalTitle: document.getElementById("modalTitle"),
   modalMessage: document.getElementById("modalMessage")
+  ,
+  analyticsGrid: document.getElementById("analyticsGrid"),
+  gradeDistributionContainer: document.getElementById("gradeDistribution"),
+  performanceInsightsContainer: document.getElementById("performanceInsights"),
+  subjectPerformanceContainer: document.getElementById("subjectPerformance"),
+  failedSubjectsContainer: document.getElementById("failedSubjects"),
+  formulaExplanationContainer: document.getElementById("formulaExplanation")
 };
+
+/* -------------------- Analytics Helpers (Phase 6) -------------------- */
+
+function createEmptyGradeDistribution() {
+  return {
+    "A+": 0,
+    A: 0,
+    "B+": 0,
+    B: 0,
+    "C+": 0,
+    C: 0,
+    D: 0,
+    F: 0
+  };
+}
+
+function safePercentage(value, total) {
+  const v = Number(value);
+  const t = Number(total);
+  if (!Number.isFinite(v) || !Number.isFinite(t) || t === 0) {
+    return 0;
+  }
+  const pct = (v / t) * 100;
+  if (!Number.isFinite(pct)) return 0;
+  return Math.max(0, Math.min(100, pct));
+}
+
+const PERFORMANCE_THRESHOLDS = [
+  { min: 9, label: "Excellent", description: "Your GPA is in the 9.00–10.00 range." },
+  { min: 8, label: "Very Good", description: "Your GPA is in the 8.00–8.99 range." },
+  { min: 7, label: "Good", description: "Your GPA is in the 7.00–7.99 range." },
+  { min: 6, label: "Satisfactory", description: "Your GPA is in the 6.00–6.99 range." },
+  { min: 5, label: "Needs Improvement", description: "Your GPA is in the 5.00–5.99 range." },
+  { min: 0, label: "Needs Attention", description: "Your GPA is below 5.00." }
+];
+
+function getPerformanceLevel(gpa) {
+  if (!Number.isFinite(gpa)) {
+    return { label: "No Data", description: "No subjects available." };
+  }
+
+  for (const t of PERFORMANCE_THRESHOLDS) {
+    if (gpa >= t.min) {
+      return { label: t.label, description: t.description };
+    }
+  }
+
+  return { label: "No Data", description: "No subjects available." };
+}
+
+function calculateAnalytics(subjects) {
+  if (!Array.isArray(subjects)) {
+    return null;
+  }
+
+  const subjectCount = subjects.length;
+  const totalCredits = calculateTotalCredits(subjects);
+  const totalQualityPoints = calculateTotalQualityPoints(subjects);
+  const gpa = calculateGPA(subjects);
+
+  // Average Grade Point (unweighted)
+  const gradePoints = subjects.reduce((acc, s) => {
+    const gp = getGradePoint(s.grade);
+    return Number.isFinite(gp) ? acc + gp : acc;
+  }, 0);
+
+  const averageGradePoint = subjectCount === 0 ? 0 : gradePoints / subjectCount;
+
+  // Pass / Fail
+  const passedSubjects = subjects.filter((s) => {
+    const gp = getGradePoint(s.grade);
+    return gp !== null && String(s.grade) !== "F";
+  }).length;
+
+  const failedSubjects = subjects.filter((s) => String(s.grade) === "F").length;
+
+  const passRate = safePercentage(passedSubjects, subjectCount);
+  const failRate = safePercentage(failedSubjects, subjectCount);
+
+  // Grade distribution
+  const gradeDistribution = createEmptyGradeDistribution();
+  subjects.forEach((s) => {
+    if (Object.prototype.hasOwnProperty.call(gradeDistribution, s.grade)) {
+      gradeDistribution[s.grade] += 1;
+    }
+  });
+
+  // Highest / Lowest grade by grade point
+  let highestGradePoint = -Infinity;
+  let lowestGradePoint = Infinity;
+  subjects.forEach((s) => {
+    const gp = getGradePoint(s.grade);
+    if (Number.isFinite(gp)) {
+      highestGradePoint = Math.max(highestGradePoint, gp);
+      lowestGradePoint = Math.min(lowestGradePoint, gp);
+    }
+  });
+
+  const highestGrade = highestGradePoint === -Infinity ? null : Object.keys(GRADE_POINTS).find((k) => GRADE_POINTS[k] === highestGradePoint) || null;
+  const lowestGrade = lowestGradePoint === Infinity ? null : Object.keys(GRADE_POINTS).find((k) => GRADE_POINTS[k] === lowestGradePoint) || null;
+
+  // Highest credit subjects (may be ties)
+  let maxCredits = -Infinity;
+  subjects.forEach((s) => {
+    const c = Number(s.credits);
+    if (Number.isFinite(c)) {
+      maxCredits = Math.max(maxCredits, c);
+    }
+  });
+  const highestCreditSubjects = maxCredits === -Infinity ? [] : subjects.filter((s) => Number(s.credits) === maxCredits);
+
+  // Highest quality point subjects
+  let maxQuality = -Infinity;
+  subjects.forEach((s) => {
+    const gp = getGradePoint(s.grade);
+    const q = Number.isFinite(gp) && Number.isFinite(Number(s.credits)) ? calculateQualityPoints(Number(s.credits), gp) : -Infinity;
+    maxQuality = Math.max(maxQuality, q);
+  });
+  const highestQualitySubjects = maxQuality === -Infinity ? [] : subjects.filter((s) => {
+    const gp = getGradePoint(s.grade);
+    if (!Number.isFinite(gp)) return false;
+    return calculateQualityPoints(Number(s.credits), gp) === maxQuality;
+  });
+
+  return {
+    subjectCount,
+    totalCredits,
+    totalQualityPoints,
+    gpa,
+    averageGradePoint,
+    passedSubjects,
+    failedSubjects,
+    passRate,
+    failRate,
+    gradeDistribution,
+    highestGrade,
+    lowestGrade,
+    highestCreditSubjects,
+    highestQualitySubjects
+  };
+}
+
+function generatePerformanceInsights(analytics) {
+  if (!analytics) return [];
+  const insights = [];
+
+  insights.push({ type: "gpa", text: `Your current GPA is ${formatGPA(analytics.gpa)}.` });
+  insights.push({ type: "pass", text: `${analytics.passedSubjects} of ${analytics.subjectCount} subjects are passed.` });
+
+  if (analytics.highestGrade) {
+    insights.push({ type: "highest", text: `Highest grade: ${analytics.highestGrade}.` });
+  }
+
+  if (analytics.lowestGrade) {
+    insights.push({ type: "lowest", text: `Lowest grade: ${analytics.lowestGrade}.` });
+  }
+
+  insights.push({ type: "average", text: `Average Grade Point: ${Number(analytics.averageGradePoint).toFixed(2)}.` });
+
+  return insights.slice(0, 6);
+}
+
+/* -------------------- Analytics Rendering -------------------- */
+
+function renderAnalytics(analytics) {
+  if (!elements.analyticsGrid) return;
+
+  elements.analyticsGrid.innerHTML = "";
+
+  const createCard = (title, value, desc) => {
+    const card = document.createElement("div");
+    card.className = "analytics-card";
+    card.innerHTML = `<div class='card-title'>${title}</div><div class='card-value'>${value}</div><div class='card-desc'>${desc || ""}</div>`;
+    return card;
+  };
+
+  // GPA card (dominant)
+  const perf = getPerformanceLevel(analytics.gpa);
+  elements.analyticsGrid.appendChild(createCard("Current GPA", formatGPA(analytics.gpa), perf.label + (analytics.subjectCount ? ` • ${analytics.totalCredits} credits • ${analytics.subjectCount} subjects` : "")));
+
+  elements.analyticsGrid.appendChild(createCard("Total Subjects", analytics.subjectCount, "Subjects entered"));
+  elements.analyticsGrid.appendChild(createCard("Total Credits", analytics.totalCredits, "Across all subjects"));
+  elements.analyticsGrid.appendChild(createCard("Average Grade Point", Number(analytics.averageGradePoint).toFixed(2), "Unweighted subject average"));
+  elements.analyticsGrid.appendChild(createCard("Pass Rate", `${Math.round(analytics.passRate)}%`, `${analytics.passedSubjects} of ${analytics.subjectCount} passed`));
+  elements.analyticsGrid.appendChild(createCard("Failed Subjects", analytics.failedSubjects, "Subjects with grade F"));
+
+  renderGradeDistribution(analytics);
+  renderPerformanceInsights(analytics);
+  renderSubjectPerformance(analytics);
+  renderFailedSubjects(analytics);
+  renderFormulaExplanation(analytics);
+}
+
+function renderGradeDistribution(analytics) {
+  if (!elements.gradeDistributionContainer) return;
+  const container = elements.gradeDistributionContainer;
+  container.innerHTML = "";
+
+  const grades = ["A+", "A", "B+", "B", "C+", "C", "D", "F"];
+  grades.forEach((grade) => {
+    const count = analytics.gradeDistribution[grade] || 0;
+    const pct = Math.round(safePercentage(count, analytics.subjectCount));
+
+    const row = document.createElement("div");
+    row.className = "grade-row";
+
+    const label = document.createElement("div");
+    label.className = "grade-label";
+    label.textContent = grade;
+
+    const barWrap = document.createElement("div");
+    barWrap.className = "grade-bar";
+    const fill = document.createElement("div");
+    fill.className = "grade-bar-fill";
+    fill.style.width = pct + "%";
+    fill.setAttribute("role", "progressbar");
+    fill.setAttribute("aria-valuemin", "0");
+    fill.setAttribute("aria-valuemax", "100");
+    fill.setAttribute("aria-valuenow", String(pct));
+    barWrap.appendChild(fill);
+
+    const countEl = document.createElement("div");
+    countEl.className = "grade-count";
+    countEl.textContent = String(count);
+
+    const pctEl = document.createElement("div");
+    pctEl.className = "grade-percentage";
+    pctEl.textContent = `${pct}%`;
+
+    row.append(label, barWrap, countEl, pctEl);
+    container.appendChild(row);
+  });
+}
+
+function renderPerformanceInsights(analytics) {
+  if (!elements.performanceInsightsContainer) return;
+  const container = elements.performanceInsightsContainer;
+  container.innerHTML = "";
+
+  const insights = generatePerformanceInsights(analytics);
+  if (insights.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "insight-item";
+    empty.textContent = "Add subjects to generate performance insights.";
+    container.appendChild(empty);
+    return;
+  }
+
+  insights.forEach((ins) => {
+    const item = document.createElement("div");
+    item.className = "insight-item";
+    item.textContent = ins.text;
+    container.appendChild(item);
+  });
+}
+
+function renderSubjectPerformance(analytics) {
+  if (!elements.subjectPerformanceContainer) return;
+  const container = elements.subjectPerformanceContainer;
+  container.innerHTML = "";
+
+  if (!analytics || analytics.subjectCount === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = `<p>No subjects available.</p><span>Add subjects to view subject performance.</span>`;
+    container.appendChild(empty);
+    return;
+  }
+
+  const table = document.createElement("table");
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th scope="col">Subject</th>
+        <th scope="col">Credits</th>
+        <th scope="col">Grade</th>
+        <th scope="col">Grade Point</th>
+        <th scope="col">Quality Points</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  const tbody = table.querySelector("tbody");
+  state.subjects.forEach((s) => {
+    const gp = getGradePoint(s.grade) ?? 0;
+    const qp = calculateQualityPoints(Number(s.credits) || 0, gp);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${s.name}</td>
+      <td>${s.credits}</td>
+      <td>${s.grade}</td>
+      <td>${gp}</td>
+      <td>${qp}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  container.appendChild(table);
+}
+
+function renderFailedSubjects(analytics) {
+  if (!elements.failedSubjectsContainer) return;
+  const container = elements.failedSubjectsContainer;
+  container.innerHTML = "";
+
+  const failed = state.subjects.filter((s) => String(s.grade) === "F");
+  if (failed.length === 0) {
+    const msg = document.createElement("div");
+    msg.className = "empty-state";
+    msg.innerHTML = `<p>No subjects currently have an F grade.</p>`;
+    container.appendChild(msg);
+    return;
+  }
+
+  failed.forEach((s) => {
+    const item = document.createElement("div");
+    item.className = "failed-item";
+    item.innerHTML = `<strong>${s.name}</strong><div>Grade: ${s.grade} • Credits: ${s.credits}</div>`;
+    container.appendChild(item);
+  });
+}
+
+function renderFormulaExplanation(analytics) {
+  if (!elements.formulaExplanationContainer) return;
+  const container = elements.formulaExplanationContainer;
+  container.innerHTML = `
+    <h4>How Your GPA Is Calculated</h4>
+    <p>Total Quality Points: ${analytics.totalQualityPoints}</p>
+    <p>Total Credits: ${analytics.totalCredits}</p>
+    <p>GPA = Total Quality Points ÷ Total Credits</p>
+    <p>Quality Points = Credits × Grade Point</p>
+    <small>Performance labels are general indicators and may differ from your institution's official grading policy.</small>
+  `;
+}
 
 function setStatusMessage(message, type = "info") {
   if (!elements.statusMessage) {
@@ -408,6 +750,11 @@ function updateCalculator() {
   const results = calculateResults(state.subjects);
   state.calculationValid = results.valid;
   renderResults(results);
+  // Analytics refresh (Phase 6)
+  const analytics = calculateAnalytics(state.subjects);
+  if (analytics) {
+    renderAnalytics(analytics);
+  }
 }
 
 function clearErrors() {

@@ -936,6 +936,186 @@ p {
   gap: 1rem;
 }
 
+/* Analytics styles (Phase 6) */
+.analytics-section {
+  margin-top: 1.5rem;
+  background: transparent;
+}
+
+.analytics-top h3 {
+  font-size: 1.4rem;
+  color: var(--color-dark);
+}
+
+.analytics-top p {
+  color: var(--color-muted);
+  margin-bottom: 0.75rem;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.analytics-card {
+  grid-column: span 1;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  text-align: left;
+}
+
+.analytics-card .card-title {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.analytics-card .card-value {
+  font-size: 1.6rem;
+  color: var(--color-dark);
+  font-weight: 800;
+}
+
+.analytics-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.grade-distribution-panel,
+.insights-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 1rem;
+}
+
+.grade-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.grade-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 56px 56px;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.grade-label {
+  font-weight: 700;
+  color: var(--color-dark);
+}
+
+.grade-bar {
+  height: 12px;
+  background: rgba(17,17,17,0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.grade-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary) 0%, #f87171 100%);
+  border-radius: inherit;
+  transition: width 320ms var(--transition-normal);
+}
+
+.grade-count,
+.grade-percentage {
+  font-weight: 700;
+  text-align: right;
+  color: var(--color-dark);
+}
+
+.performance-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.insight-item {
+  background: rgba(250,250,250,0.95);
+  border: 1px solid var(--color-border);
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+}
+
+.subject-performance-panel {
+  margin-top: 1rem;
+}
+
+.subject-performance table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.subject-performance th,
+.subject-performance td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.6rem 0.5rem;
+  text-align: left;
+}
+
+.subject-card-mobile {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.8rem;
+  background: var(--color-surface);
+}
+
+.failed-subjects-panel {
+  margin-top: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 1rem;
+}
+
+.failed-item {
+  border: 1px dashed rgba(220,38,38,0.18);
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+}
+
+.formula-explanation {
+  margin-top: 1rem;
+  background: rgba(250,250,250,0.95);
+  border: 1px solid var(--color-border);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 900px) {
+  .analytics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .analytics-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .grade-row {
+    grid-template-columns: 40px 1fr 48px 48px;
+  }
+}
+
+@media (max-width: 420px) {
+  .analytics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .result-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
