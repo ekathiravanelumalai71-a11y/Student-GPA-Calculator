@@ -3,7 +3,8 @@
 const GPA_CONFIG = {
   decimalPlaces: 2,
   minCredits: 1,
-  maxCredits: 10
+  maxCredits: 10,
+  maxGpa: 10
 };
 
 const GRADE_POINTS = {
@@ -19,9 +20,11 @@ const GRADE_POINTS = {
 
 const state = {
   subjects: [],
+  semesterHistory: [],
   searchTerm: "",
   sortBy: "recent",
   editingSubjectId: null,
+  editingHistoryId: null,
   lastDeletedState: null,
   pendingDeleteId: null,
   pendingDeleteAll: false,
@@ -85,7 +88,23 @@ const elements = {
   clearFiltersBtn: document.getElementById("clearFiltersBtn"),
   resetViewBtn: document.getElementById("resetViewBtn"),
   resultCountText: document.getElementById("resultCountText"),
-  activeFiltersContainer: document.getElementById("activeFilters")
+  activeFiltersContainer: document.getElementById("activeFilters"),
+  semesterSelector: document.getElementById("semesterSelector"),
+  saveSemesterBtn: document.getElementById("saveSemesterBtn"),
+  clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+  historyStatus: document.getElementById("historyStatus"),
+  bestSemesterValue: document.getElementById("bestSemesterValue"),
+  bestSemesterLabel: document.getElementById("bestSemesterLabel"),
+  lowestSemesterValue: document.getElementById("lowestSemesterValue"),
+  lowestSemesterLabel: document.getElementById("lowestSemesterLabel"),
+  averageSemesterGpaValue: document.getElementById("averageSemesterGpaValue"),
+  historyTotalCreditsValue: document.getElementById("historyTotalCreditsValue"),
+  historyTrendMessage: document.getElementById("historyTrendMessage"),
+  historyChart: document.getElementById("historyChart"),
+  historyCountText: document.getElementById("historyCountText"),
+  historyCards: document.getElementById("historyCards"),
+  historyTable: document.getElementById("historyTable"),
+  historyEmptyState: document.getElementById("historyEmptyState")
 };
 // Persistence controls (added to elements for Phase 8)
 elements.saveNowBtn = document.getElementById("saveNowBtn");
@@ -95,8 +114,19 @@ elements.clearSavedBtn = document.getElementById("clearSavedBtn");
 elements.saveStatus = document.getElementById("saveStatus");
 elements.lastSaved = document.getElementById("lastSaved");
 
-/* -------------------- Persistence (Phase 8) -------------------- */
+/* -------------------- Persistence (Phase 8 + Phase 9) -------------------- */
 const STORAGE_KEY = "studentGpaCalculatorData_v1";
+const STORAGE_VERSION = 2;
+const SEMESTER_OPTIONS = [
+  "Semester 1",
+  "Semester 2",
+  "Semester 3",
+  "Semester 4",
+  "Semester 5",
+  "Semester 6",
+  "Semester 7",
+  "Semester 8"
+];
 
 function isLocalStorageAvailable() {
   try {
@@ -123,12 +153,75 @@ function isValidSubject(obj) {
   return true;
 }
 
+function isValidHistoryRecord(record) {
+  if (!record || typeof record !== "object") return false;
+  if (!Object.prototype.hasOwnProperty.call(record, "id")) return false;
+  if (typeof record.semester !== "string" || !SEMESTER_OPTIONS.includes(record.semester)) return false;
+  if (!Number.isFinite(Number(record.gpa)) || Number(record.gpa) < 0 || Number(record.gpa) > GPA_CONFIG.maxGpa) return false;
+  if (!Number.isFinite(Number(record.credits)) || Number(record.credits) < 0) return false;
+  if (typeof record.savedAt !== "string" || Number.isNaN(new Date(record.savedAt).getTime())) return false;
+  return true;
+}
+
+function hasDuplicateSemester(history) {
+  if (!Array.isArray(history)) return false;
+  const seen = new Set();
+  return history.some((record) => {
+    if (seen.has(record.semester)) {
+      return true;
+    }
+    seen.add(record.semester);
+    return false;
+  });
+}
+
+function parseStorageData(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+function normalizeStorageData(data) {
+  if (!data || typeof data !== "object") return null;
+  const version = Number.isFinite(Number(data.version)) ? Number(data.version) : 1;
+  const subjects = Array.isArray(data.subjects) ? data.subjects : [];
+  const semesterHistory = Array.isArray(data.semesterHistory) ? data.semesterHistory : [];
+
+  if (version === 1) {
+    return {
+      app: data.app || "Student GPA Calculator",
+      version: STORAGE_VERSION,
+      savedAt: data.savedAt || new Date().toISOString(),
+      subjects,
+      semesterHistory: []
+    };
+  }
+
+  return {
+    app: data.app || "Student GPA Calculator",
+    version: version >= STORAGE_VERSION ? version : STORAGE_VERSION,
+    savedAt: data.savedAt || new Date().toISOString(),
+    subjects,
+    semesterHistory
+  };
+}
+
 function isValidAppData(data) {
   if (!data || typeof data !== "object") return false;
   if (data.app && data.app !== "Student GPA Calculator") return false;
   if (!Number.isFinite(Number(data.version))) return false;
   if (!Array.isArray(data.subjects)) return false;
-  return data.subjects.every(isValidSubject);
+  if (!data.subjects.every(isValidSubject)) return false;
+
+  if (Number(data.version) >= 2) {
+    if (!Array.isArray(data.semesterHistory)) return false;
+    if (!data.semesterHistory.every(isValidHistoryRecord)) return false;
+    if (hasDuplicateSemester(data.semesterHistory)) return false;
+  }
+
+  return true;
 }
 
 function saveAppData() {
@@ -139,9 +232,10 @@ function saveAppData() {
 
   const payload = {
     app: "Student GPA Calculator",
-    version: 1,
+    version: STORAGE_VERSION,
     savedAt: new Date().toISOString(),
-    subjects: state.subjects
+    subjects: state.subjects,
+    semesterHistory: state.semesterHistory
   };
 
   try {
@@ -149,7 +243,7 @@ function saveAppData() {
     updateSaveStatus("Saved", payload.savedAt);
     showToast("Data saved locally");
   } catch (e) {
-    updateSaveStatus("Save failed", null);
+    updateSaveStatus("Your semester result could not be saved locally.", null);
     showToast("Unable to save data locally");
     console.error("saveAppData error:", e);
   }
@@ -168,20 +262,29 @@ function loadAppData() {
       return;
     }
 
-    const parsed = JSON.parse(raw);
-    if (!isValidAppData(parsed)) {
+    const parsed = parseStorageData(raw);
+    if (!parsed) {
+      updateSaveStatus("Corrupted save", null);
+      console.warn("Stored app data is invalid JSON.");
+      return;
+    }
+
+    const normalized = normalizeStorageData(parsed);
+    if (!normalized || !isValidAppData(normalized)) {
       updateSaveStatus("Corrupted save", null);
       console.warn("Stored app data failed validation and was ignored.");
       return;
     }
 
-    // Replace in-memory subjects with the saved copy
-    state.subjects = parsed.subjects.map((s) => ({ ...s }));
+    state.subjects = normalized.subjects.map((s) => ({ ...s }));
+    state.semesterHistory = normalized.semesterHistory.map((item) => ({ ...item }));
+
     updateCreditOptions();
     resetView();
     renderSubjects();
     updateCalculator();
-    updateSaveStatus("Loaded", parsed.savedAt || new Date().toISOString());
+    renderSemesterHistory();
+    updateSaveStatus("Loaded", normalized.savedAt || new Date().toISOString());
   } catch (e) {
     updateSaveStatus("Load failed", null);
     console.error("loadAppData error:", e);
@@ -191,9 +294,10 @@ function loadAppData() {
 function exportBackup() {
   const payload = {
     app: "Student GPA Calculator",
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    subjects: state.subjects
+    version: STORAGE_VERSION,
+    savedAt: new Date().toISOString(),
+    subjects: state.subjects,
+    semesterHistory: state.semesterHistory
   };
 
   const content = JSON.stringify(payload, null, 2);
@@ -213,25 +317,26 @@ function exportBackup() {
 function importBackupFromFile(file) {
   if (!file) return;
   file.text().then((text) => {
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
+    const parsed = parseStorageData(text);
+    if (!parsed) {
       showToast("Invalid backup file (not valid JSON)");
       return;
     }
 
-    if (!isValidAppData(parsed)) {
+    const normalized = normalizeStorageData(parsed);
+    if (!normalized || !isValidAppData(normalized)) {
       showToast("Backup file did not pass validation");
       return;
     }
 
-    showModal("Importing this backup will replace your current subjects. Continue?", "Import", () => {
-      state.subjects = parsed.subjects.map((s) => ({ ...s }));
+    showModal("Importing this backup will replace your current subjects and semester history. Continue?", "Import", () => {
+      state.subjects = normalized.subjects.map((s) => ({ ...s }));
+      state.semesterHistory = normalized.semesterHistory.map((item) => ({ ...item }));
       updateCreditOptions();
       resetView();
       renderSubjects();
       updateCalculator();
+      renderSemesterHistory();
       saveAppData();
       showToast("Backup imported");
     });
@@ -242,7 +347,7 @@ function importBackupFromFile(file) {
 }
 
 function clearSavedData() {
-  showModal("This will remove saved data and clear all subjects. Continue?", "Clear", () => {
+  showModal("This will remove saved data and clear all subjects and semester history. Continue?", "Clear", () => {
     try {
       if (isLocalStorageAvailable()) localStorage.removeItem(STORAGE_KEY);
     } catch (e) {
@@ -250,14 +355,477 @@ function clearSavedData() {
     }
 
     state.subjects = [];
+    state.semesterHistory = [];
     renderSubjects();
     updateCalculator();
+    renderSemesterHistory();
     updateCreditOptions();
     updateSaveStatus("No saved data", null);
     showToast("Saved data cleared");
   });
 }
 
+function formatHistoryDate(isoString) {
+  const date = new Date(isoString);
+  if (!Number.isFinite(date.getTime())) {
+    return "Unknown date";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function getHistoryRecordBySemester(semester) {
+  return state.semesterHistory.find((record) => record.semester === semester);
+}
+
+function getHistoryRecordById(id) {
+  return state.semesterHistory.find((record) => String(record.id) === String(id));
+}
+
+function getSortedSemesterHistory() {
+  return [...state.semesterHistory].sort((a, b) => {
+    const aNum = Number((String(a.semester).match(/\d+/) || [0])[0]);
+    const bNum = Number((String(b.semester).match(/\d+/) || [0])[0]);
+    return aNum - bNum;
+  });
+}
+
+function calculateHistorySummary() {
+  const history = getSortedSemesterHistory();
+  const count = history.length;
+  if (count === 0) {
+    return {
+      count: 0,
+      totalCredits: 0,
+      averageGpa: 0,
+      best: null,
+      lowest: null,
+      latest: null,
+      previous: null,
+      trendLabel: "No data",
+      trendDiff: 0
+    };
+  }
+
+  const totalCredits = history.reduce((sum, record) => sum + Number(record.credits), 0);
+  const averageGpa = history.reduce((sum, record) => sum + Number(record.gpa), 0) / count;
+  const best = history.reduce((bestSoFar, record) => {
+    if (!bestSoFar || Number(record.gpa) > Number(bestSoFar.gpa) || (Number(record.gpa) === Number(bestSoFar.gpa) && Number((record.semester.match(/\d+/) || [0])[0]) > Number((bestSoFar.semester.match(/\d+/) || [0])[0]))) {
+      return record;
+    }
+    return bestSoFar;
+  }, null);
+  const lowest = history.reduce((lowSoFar, record) => {
+    if (!lowSoFar || Number(record.gpa) < Number(lowSoFar.gpa) || (Number(record.gpa) === Number(lowSoFar.gpa) && Number((record.semester.match(/\d+/) || [0])[0]) > Number((lowSoFar.semester.match(/\d+/) || [0])[0]))) {
+      return record;
+    }
+    return lowSoFar;
+  }, null);
+
+  const latest = history[count - 1];
+  const previous = count > 1 ? history[count - 2] : null;
+  let trendLabel = "No trend";
+  let trendDiff = 0;
+
+  if (previous && latest) {
+    trendDiff = Number(latest.gpa) - Number(previous.gpa);
+    const absDiff = Math.abs(trendDiff);
+    if (absDiff < 0.01) {
+      trendLabel = "Stable";
+      trendDiff = 0;
+    } else if (trendDiff > 0) {
+      trendLabel = "Improving";
+    } else {
+      trendLabel = "Needs Attention";
+    }
+  }
+
+  return {
+    count,
+    totalCredits,
+    averageGpa,
+    best,
+    lowest,
+    latest,
+    previous,
+    trendLabel,
+    trendDiff
+  };
+}
+
+function normalizeSemesterSelection(value) {
+  return SEMESTER_OPTIONS.includes(value) ? value : "";
+}
+
+function updateHistoryStatus(message, type = "info") {
+  if (!elements.historyStatus) return;
+  elements.historyStatus.textContent = message;
+  elements.historyStatus.className = `form-status ${type}`;
+}
+
+function updateSaveSemesterButton() {
+  if (!elements.saveSemesterBtn) return;
+  elements.saveSemesterBtn.textContent = state.editingHistoryId ? "Update Semester Result" : "Save Semester Result";
+}
+
+function saveSemesterResult() {
+  if (!elements.semesterSelector) return;
+
+  const semester = normalizeSemesterSelection(elements.semesterSelector.value);
+  const results = calculateResults(state.subjects);
+
+  if (!semester) {
+    updateHistoryStatus("Please select a semester.", "error");
+    showToast("Please select a semester.");
+    return;
+  }
+
+  if (!results.valid || results.gpa === null || state.subjects.length === 0) {
+    updateHistoryStatus("Add subjects and calculate your GPA first.", "error");
+    showToast("Calculate a valid GPA before saving.");
+    return;
+  }
+
+  const existing = getHistoryRecordBySemester(semester);
+  const payload = {
+    id: `semester-${semester.toLowerCase().replace(/\s+/g, "-")}`,
+    semester,
+    gpa: Number(formatGPA(results.gpa)),
+    credits: calculateTotalCredits(state.subjects),
+    savedAt: new Date().toISOString()
+  };
+
+  if (state.editingHistoryId) {
+    const editingRecord = getHistoryRecordById(state.editingHistoryId);
+    if (!editingRecord) {
+      updateHistoryStatus("Unable to update the selected history record.", "error");
+      return;
+    }
+
+    if (existing && String(existing.id) !== String(state.editingHistoryId)) {
+      updateHistoryStatus(`Semester ${semester} already has a saved result.`, "error");
+      showToast(`Semester ${semester} already has a saved result.`);
+      return;
+    }
+
+    editingRecord.semester = payload.semester;
+    editingRecord.gpa = payload.gpa;
+    editingRecord.credits = payload.credits;
+    editingRecord.savedAt = payload.savedAt;
+    updateHistoryStatus(`Semester ${semester} result updated successfully.`, "info");
+    showToast(`Semester ${semester} updated successfully.`);
+    state.editingHistoryId = null;
+  } else {
+    if (existing) {
+      showModal(`Semester ${semester} already has a saved result. Update it or cancel?`, "Update Result", () => {
+        existing.gpa = payload.gpa;
+        existing.credits = payload.credits;
+        existing.savedAt = payload.savedAt;
+        state.editingHistoryId = null;
+        renderSemesterHistory();
+        saveAppData();
+        updateHistoryStatus(`Semester ${semester} result updated successfully.`, "info");
+        showToast(`Semester ${semester} updated successfully.`);
+      });
+      return;
+    }
+
+    state.semesterHistory.push(payload);
+    updateHistoryStatus(`Semester ${semester} saved successfully.`, "info");
+    showToast(`Semester ${semester} saved successfully.`);
+  }
+
+  elements.semesterSelector.value = "";
+  updateSaveSemesterButton();
+  renderSemesterHistory();
+  saveAppData();
+}
+
+function editHistoryRecord(id) {
+  const record = getHistoryRecordById(id);
+  if (!record) return;
+
+  state.editingHistoryId = String(record.id);
+  if (elements.semesterSelector) {
+    elements.semesterSelector.value = record.semester;
+  }
+  updateSaveSemesterButton();
+  updateHistoryStatus(`Editing ${record.semester}. Save changes to update the history entry.`, "info");
+}
+
+function deleteHistoryRecord(id) {
+  const record = getHistoryRecordById(id);
+  if (!record) return;
+
+  showModal(`Delete ${record.semester} history?`, "Delete", () => {
+    state.semesterHistory = state.semesterHistory.filter((item) => String(item.id) !== String(id));
+    if (state.editingHistoryId === String(id)) {
+      state.editingHistoryId = null;
+      if (elements.semesterSelector) elements.semesterSelector.value = "";
+      updateSaveSemesterButton();
+    }
+    renderSemesterHistory();
+    saveAppData();
+    updateHistoryStatus(`${record.semester} deleted.`, "info");
+    showToast(`${record.semester} deleted.`);
+  });
+}
+
+function clearSemesterHistory() {
+  showModal("Are you sure you want to clear all semester history?", "Clear", () => {
+    state.semesterHistory = [];
+    renderSemesterHistory();
+    saveAppData();
+    updateHistoryStatus("GPA history cleared.", "info");
+    showToast("GPA history cleared.");
+  });
+}
+
+function renderSemesterHistory() {
+  renderHistorySummary();
+  renderHistoryCards();
+  renderHistoryTable();
+  renderHistoryChart();
+}
+
+function renderHistorySummary() {
+  const summary = calculateHistorySummary();
+  if (elements.bestSemesterValue) {
+    elements.bestSemesterValue.textContent = summary.best ? formatGPA(summary.best.gpa) : "—";
+  }
+  if (elements.bestSemesterLabel) {
+    elements.bestSemesterLabel.textContent = summary.best ? summary.best.semester : "No history yet";
+  }
+  if (elements.lowestSemesterValue) {
+    elements.lowestSemesterValue.textContent = summary.lowest ? formatGPA(summary.lowest.gpa) : "—";
+  }
+  if (elements.lowestSemesterLabel) {
+    elements.lowestSemesterLabel.textContent = summary.lowest ? summary.lowest.semester : "No history yet";
+  }
+  if (elements.averageSemesterGpaValue) {
+    elements.averageSemesterGpaValue.textContent = summary.count > 0 ? formatGPA(summary.averageGpa) : "—";
+  }
+  if (elements.historyTotalCreditsValue) {
+    elements.historyTotalCreditsValue.textContent = String(summary.totalCredits);
+  }
+  if (elements.historyCountText) {
+    elements.historyCountText.textContent = summary.count === 1 ? "1 semester recorded" : `${summary.count} semesters recorded`;
+  }
+  if (elements.historyTrendMessage) {
+    if (summary.count === 0) {
+      elements.historyTrendMessage.textContent = "Save semester results to start tracking your trend.";
+    } else if (summary.count === 1) {
+      elements.historyTrendMessage.textContent = "Your first semester is saved. Add another semester to see your trend.";
+    } else {
+      const diff = summary.trendDiff;
+      const direction = diff > 0 ? "↑" : diff < 0 ? "↓" : "→";
+      const formattedDiff = diff === 0 ? "0.00" : `${diff > 0 ? "+" : ""}${diff.toFixed(2)}`;
+      elements.historyTrendMessage.textContent = `Your latest GPA is ${formatGPA(summary.latest.gpa)}, ${summary.trendLabel.toLowerCase()} ${direction} (${formattedDiff}).`;
+    }
+  }
+}
+
+function renderHistoryCards() {
+  if (!elements.historyCards) return;
+  const history = getSortedSemesterHistory();
+  const summary = calculateHistorySummary();
+  elements.historyCards.innerHTML = "";
+  if (history.length === 0) {
+    if (elements.historyEmptyState) {
+      elements.historyEmptyState.style.display = "block";
+    }
+    if (elements.historyTable) {
+      elements.historyTable.style.display = "none";
+    }
+    return;
+  }
+
+  if (elements.historyEmptyState) {
+    elements.historyEmptyState.style.display = "none";
+  }
+  if (elements.historyTable) {
+    elements.historyTable.style.display = "table";
+  }
+
+  history.forEach((record, index) => {
+    const card = document.createElement("article");
+    card.className = "history-card";
+    const isLatest = index === history.length - 1;
+    const isBest = summary.best && record.semester === summary.best.semester && Number(record.gpa) === Number(summary.best.gpa);
+    const isLowest = summary.lowest && record.semester === summary.lowest.semester && Number(record.gpa) === Number(summary.lowest.gpa);
+    const badgeLabels = [];
+    if (isLatest) badgeLabels.push("Latest");
+    if (isBest && !isLatest) badgeLabels.push("Best");
+    if (isLowest && !isLatest && !isBest) badgeLabels.push("Lowest Recorded");
+
+    card.innerHTML = `
+      <div class="history-card-header">
+        <div>
+          <p class="card-label">${record.semester}</p>
+          <strong class="history-card-value">${formatGPA(record.gpa)}</strong>
+        </div>
+        <span class="history-card-badge">${badgeLabels.join(" · ")}</span>
+      </div>
+      <div class="history-card-body">
+        <p class="history-card-meta">Credits: ${record.credits}</p>
+        <p class="history-card-meta">Saved: ${formatHistoryDate(record.savedAt)}</p>
+      </div>
+      <div class="history-card-actions">
+        <button type="button" class="subject-action-button" data-history-action="edit" data-id="${record.id}">Update</button>
+        <button type="button" class="danger-button" data-history-action="delete" data-id="${record.id}">Delete</button>
+      </div>
+    `;
+
+    elements.historyCards.appendChild(card);
+  });
+}
+
+function renderHistoryTable() {
+  if (!elements.historyTable) return;
+  const tbody = elements.historyTable.querySelector("tbody");
+  if (!tbody) return;
+
+  const history = getSortedSemesterHistory();
+  tbody.innerHTML = "";
+  if (history.length === 0) {
+    return;
+  }
+
+  history.forEach((record, index) => {
+    const row = document.createElement("tr");
+    const actionsCell = document.createElement("td");
+    const editButton = document.createElement("button");
+    const deleteButton = document.createElement("button");
+
+    editButton.type = "button";
+    editButton.className = "subject-action-button";
+    editButton.dataset.historyAction = "edit";
+    editButton.dataset.id = record.id;
+    editButton.textContent = "Update";
+
+    deleteButton.type = "button";
+    deleteButton.className = "danger-button";
+    deleteButton.dataset.historyAction = "delete";
+    deleteButton.dataset.id = record.id;
+    deleteButton.textContent = "Delete";
+
+    actionsCell.append(editButton, deleteButton);
+    actionsCell.className = "history-table-actions";
+
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${record.semester}</td>
+      <td>${formatGPA(record.gpa)}</td>
+      <td>${record.credits}</td>
+      <td>${formatHistoryDate(record.savedAt)}</td>
+    `;
+    row.appendChild(actionsCell);
+    tbody.appendChild(row);
+  });
+}
+
+function clearCanvas(canvas) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function renderHistoryChart() {
+  if (!elements.historyChart) return;
+  const canvas = elements.historyChart;
+  const history = getSortedSemesterHistory();
+  const parentWidth = canvas.clientWidth;
+  const parentHeight = canvas.clientHeight || 280;
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width = Math.floor(parentWidth * dpr);
+  canvas.height = Math.floor(parentHeight * dpr);
+  canvas.style.width = `${parentWidth}px`;
+  canvas.style.height = `${parentHeight}px`;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, parentWidth, parentHeight);
+
+  if (history.length === 0) {
+    return;
+  }
+
+  const padding = 40;
+  const chartWidth = parentWidth - padding * 2;
+  const chartHeight = parentHeight - padding * 2;
+  const minGpa = 0;
+  const maxGpa = GPA_CONFIG.maxGpa;
+  const pointRadius = 5;
+
+  const xStep = chartWidth / Math.max(history.length - 1, 1);
+  const yScale = chartHeight / (maxGpa - minGpa);
+
+  const points = history.map((record, index) => {
+    const x = padding + index * xStep;
+    const y = padding + chartHeight - (Number(record.gpa) - minGpa) * yScale;
+    return { x, y, record };
+  });
+
+  ctx.strokeStyle = "rgba(220, 38, 38, 0.95)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    if (index === 0) {
+      ctx.moveTo(point.x, point.y);
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255,255,255,1)";
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(220, 38, 38, 1)";
+  points.forEach((point) => {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, pointRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  ctx.strokeStyle = "rgba(51, 51, 51, 0.16)";
+  ctx.lineWidth = 1;
+  const ticks = [0, 2.5, 5, 7.5, 10];
+  ticks.forEach((tick) => {
+    const y = padding + chartHeight - (tick - minGpa) * yScale;
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(parentWidth - padding, y);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(51, 51, 51, 0.7)";
+    ctx.font = "12px Inter, Arial, sans-serif";
+    ctx.fillText(tick.toFixed(1), 6, y + 4);
+  });
+
+  ctx.fillStyle = "rgba(51, 51, 51, 0.9)";
+  ctx.font = "12px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  points.forEach((point) => {
+    ctx.fillText(point.record.semester, point.x, parentHeight - 12);
+  });
+}
+
+let historyChartResizeTimeout = null;
+function scheduleHistoryChartRender() {
+  if (historyChartResizeTimeout) {
+    clearTimeout(historyChartResizeTimeout);
+  }
+  historyChartResizeTimeout = setTimeout(() => {
+    renderHistoryChart();
+  }, 120);
+}
 
 /* -------------------- View State (Phase 7) -------------------- */
 const viewState = {
@@ -1851,6 +2419,46 @@ function setupEventListeners() {
       clearSavedData();
     });
   }
+
+  if (elements.saveSemesterBtn) {
+    elements.saveSemesterBtn.addEventListener("click", saveSemesterResult);
+  }
+
+  if (elements.clearHistoryBtn) {
+    elements.clearHistoryBtn.addEventListener("click", clearSemesterHistory);
+  }
+
+  if (elements.historyCards) {
+    elements.historyCards.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-history-action]");
+      if (!button) return;
+      const id = button.dataset.id;
+      const action = button.dataset.historyAction;
+      if (action === "edit") {
+        editHistoryRecord(id);
+      }
+      if (action === "delete") {
+        deleteHistoryRecord(id);
+      }
+    });
+  }
+
+  if (elements.historyTable) {
+    elements.historyTable.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-history-action]");
+      if (!button) return;
+      const id = button.dataset.id;
+      const action = button.dataset.historyAction;
+      if (action === "edit") {
+        editHistoryRecord(id);
+      }
+      if (action === "delete") {
+        deleteHistoryRecord(id);
+      }
+    });
+  }
+
+  window.addEventListener("resize", scheduleHistoryChartRender);
 
   ["subjectName", "credits", "grade"].forEach((fieldId) => {
     const field = document.getElementById(fieldId);

@@ -269,6 +269,98 @@
             </article>
           </div>
 
+          <section id="semesterHistorySection" class="semester-history-section" aria-labelledby="historySectionTitle">
+            <div class="section-header history-header">
+              <h3 id="historySectionTitle">GPA History</h3>
+              <p>Track your semester performance over time. Save completed semester results to compare progress.</p>
+            </div>
+
+            <div class="history-controls-panel">
+              <div class="history-controls-row">
+                <label for="semesterSelector">Current Semester</label>
+                <select id="semesterSelector" aria-label="Select current semester">
+                  <option value="">Select Semester</option>
+                  <option value="Semester 1">Semester 1</option>
+                  <option value="Semester 2">Semester 2</option>
+                  <option value="Semester 3">Semester 3</option>
+                  <option value="Semester 4">Semester 4</option>
+                  <option value="Semester 5">Semester 5</option>
+                  <option value="Semester 6">Semester 6</option>
+                  <option value="Semester 7">Semester 7</option>
+                  <option value="Semester 8">Semester 8</option>
+                </select>
+              </div>
+
+              <div class="history-controls-row history-controls-actions">
+                <button id="saveSemesterBtn" class="primary-button" type="button">Save Semester Result</button>
+                <button id="clearHistoryBtn" class="secondary-action-button" type="button">Clear GPA History</button>
+              </div>
+
+              <p id="historyStatus" class="form-status" aria-live="polite"></p>
+            </div>
+
+            <div class="history-summary-grid" aria-label="Semester history summary">
+              <article class="result-card">
+                <p class="card-label">Best Semester</p>
+                <strong id="bestSemesterValue" class="result-value small">—</strong>
+                <span id="bestSemesterLabel" class="mini-text">No history yet</span>
+              </article>
+
+              <article class="result-card">
+                <p class="card-label">Lowest Semester</p>
+                <strong id="lowestSemesterValue" class="result-value small">—</strong>
+                <span id="lowestSemesterLabel" class="mini-text">No history yet</span>
+              </article>
+
+              <article class="result-card">
+                <p class="card-label">Average Semester GPA</p>
+                <strong id="averageSemesterGpaValue" class="result-value small">—</strong>
+              </article>
+
+              <article class="result-card">
+                <p class="card-label">Total Recorded Credits</p>
+                <strong id="historyTotalCreditsValue" class="result-value small">0</strong>
+              </article>
+            </div>
+
+            <div class="history-trend-panel">
+              <div class="history-trend-header">
+                <h4>GPA Trend</h4>
+                <p id="historyTrendMessage" class="muted">Save two semesters to start tracking your trend.</p>
+              </div>
+              <div class="history-chart-shell">
+                <canvas id="historyChart" width="700" height="280" role="img" aria-label="Semester GPA trend chart"></canvas>
+              </div>
+            </div>
+
+            <div class="history-list-panel">
+              <div class="history-list-top">
+                <h4>Semester History</h4>
+                <span id="historyCountText" class="subject-count-label">0 semesters recorded</span>
+              </div>
+              <div id="historyEmptyState" class="empty-state" style="display:none;">
+                <p>No semester results saved yet.</p>
+                <span>Save your first semester result to start tracking progress.</span>
+              </div>
+              <div id="historyCards" class="history-cards"></div>
+              <div class="history-table-wrapper">
+                <table id="historyTable" class="history-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">S.No</th>
+                      <th scope="col">Semester</th>
+                      <th scope="col">GPA</th>
+                      <th scope="col">Credits</th>
+                      <th scope="col">Saved</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <!-- Analytics Section (Phase 6) -->
           <section id="analytics" class="analytics-section" aria-label="Performance Analytics">
             <div class="analytics-top">

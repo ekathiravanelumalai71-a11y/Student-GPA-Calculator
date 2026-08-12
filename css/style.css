@@ -1214,6 +1214,228 @@ p {
   color: var(--color-muted);
 }
 
+.semester-history-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.history-header {
+  margin-bottom: 1rem;
+}
+
+.history-controls-panel {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.history-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.history-controls-row label {
+  font-weight: 600;
+  color: var(--color-dark);
+  min-width: 160px;
+}
+
+.history-controls-row select {
+  min-width: 220px;
+  max-width: 260px;
+}
+
+.history-controls-actions {
+  justify-content: flex-start;
+}
+
+.history-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.history-trend-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.history-trend-header {
+  margin-bottom: 0.75rem;
+}
+
+.history-chart-shell {
+  position: relative;
+  min-height: 260px;
+}
+
+.history-chart-shell canvas {
+  width: 100%;
+  height: 280px;
+  border-radius: var(--radius-lg);
+  background: rgba(250, 250, 250, 0.95);
+}
+
+.history-list-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.history-list-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.history-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.history-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.history-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.history-card-value {
+  display: block;
+  font-size: 2rem;
+  color: var(--color-dark);
+  margin-top: 0.35rem;
+}
+
+.history-card-badge {
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.history-card-body {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.history-card-meta {
+  color: var(--color-muted);
+  font-size: 0.95rem;
+}
+
+.history-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.history-table-wrapper {
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.history-table th,
+.history-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.85rem 0.9rem;
+  text-align: left;
+}
+
+.history-table th {
+  background: rgba(220, 38, 38, 0.04);
+  color: var(--color-dark);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08rem;
+}
+
+.history-table-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.history-empty-state {
+  margin: 0;
+  border: 1px dashed rgba(220, 38, 38, 0.25);
+  background: rgba(254, 242, 242, 0.45);
+  padding: 1rem;
+}
+
+@media (max-width: 980px) {
+  .history-summary-grid,
+  .history-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .history-controls-panel,
+  .history-summary-grid,
+  .history-list-top,
+  .history-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .history-controls-row {
+    justify-content: stretch;
+  }
+
+  .history-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .history-table {
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .history-card {
+    padding: 0.9rem;
+  }
+
+  .history-card-value {
+    font-size: 1.8rem;
+  }
+}
+
 .last-saved {
   color: var(--color-muted);
   font-size: 0.9rem;
