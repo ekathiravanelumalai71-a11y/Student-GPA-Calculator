@@ -87,6 +87,177 @@ const elements = {
   resultCountText: document.getElementById("resultCountText"),
   activeFiltersContainer: document.getElementById("activeFilters")
 };
+// Persistence controls (added to elements for Phase 8)
+elements.saveNowBtn = document.getElementById("saveNowBtn");
+elements.exportBtn = document.getElementById("exportBtn");
+elements.importInput = document.getElementById("importInput");
+elements.clearSavedBtn = document.getElementById("clearSavedBtn");
+elements.saveStatus = document.getElementById("saveStatus");
+elements.lastSaved = document.getElementById("lastSaved");
+
+/* -------------------- Persistence (Phase 8) -------------------- */
+const STORAGE_KEY = "studentGpaCalculatorData_v1";
+
+function isLocalStorageAvailable() {
+  try {
+    const test = "__storage_test__";
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function updateSaveStatus(statusText, isoTimestamp) {
+  if (elements.saveStatus) elements.saveStatus.textContent = statusText || "";
+  if (elements.lastSaved) elements.lastSaved.textContent = isoTimestamp ? new Date(isoTimestamp).toLocaleString() : "";
+}
+
+function isValidSubject(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  if (!Object.prototype.hasOwnProperty.call(obj, "id")) return false;
+  if (typeof obj.name !== "string" || obj.name.trim().length === 0) return false;
+  if (!Number.isFinite(Number(obj.credits)) || Number(obj.credits) <= 0) return false;
+  if (!Object.prototype.hasOwnProperty.call(GRADE_POINTS, obj.grade)) return false;
+  return true;
+}
+
+function isValidAppData(data) {
+  if (!data || typeof data !== "object") return false;
+  if (data.app && data.app !== "Student GPA Calculator") return false;
+  if (!Number.isFinite(Number(data.version))) return false;
+  if (!Array.isArray(data.subjects)) return false;
+  return data.subjects.every(isValidSubject);
+}
+
+function saveAppData() {
+  if (!isLocalStorageAvailable()) {
+    updateSaveStatus("Local saving unavailable", null);
+    return;
+  }
+
+  const payload = {
+    app: "Student GPA Calculator",
+    version: 1,
+    savedAt: new Date().toISOString(),
+    subjects: state.subjects
+  };
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    updateSaveStatus("Saved", payload.savedAt);
+    showToast("Data saved locally");
+  } catch (e) {
+    updateSaveStatus("Save failed", null);
+    showToast("Unable to save data locally");
+    console.error("saveAppData error:", e);
+  }
+}
+
+function loadAppData() {
+  if (!isLocalStorageAvailable()) {
+    updateSaveStatus("Local storage unavailable", null);
+    return;
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      updateSaveStatus("No saved data", null);
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!isValidAppData(parsed)) {
+      updateSaveStatus("Corrupted save", null);
+      console.warn("Stored app data failed validation and was ignored.");
+      return;
+    }
+
+    // Replace in-memory subjects with the saved copy
+    state.subjects = parsed.subjects.map((s) => ({ ...s }));
+    updateCreditOptions();
+    resetView();
+    renderSubjects();
+    updateCalculator();
+    updateSaveStatus("Loaded", parsed.savedAt || new Date().toISOString());
+  } catch (e) {
+    updateSaveStatus("Load failed", null);
+    console.error("loadAppData error:", e);
+  }
+}
+
+function exportBackup() {
+  const payload = {
+    app: "Student GPA Calculator",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    subjects: state.subjects
+  };
+
+  const content = JSON.stringify(payload, null, 2);
+  const blob = new Blob([content], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const now = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  a.href = url;
+  a.download = `student-gpa-backup-${now}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("Backup exported");
+}
+
+function importBackupFromFile(file) {
+  if (!file) return;
+  file.text().then((text) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      showToast("Invalid backup file (not valid JSON)");
+      return;
+    }
+
+    if (!isValidAppData(parsed)) {
+      showToast("Backup file did not pass validation");
+      return;
+    }
+
+    showModal("Importing this backup will replace your current subjects. Continue?", "Import", () => {
+      state.subjects = parsed.subjects.map((s) => ({ ...s }));
+      updateCreditOptions();
+      resetView();
+      renderSubjects();
+      updateCalculator();
+      saveAppData();
+      showToast("Backup imported");
+    });
+  }).catch((e) => {
+    console.error("importBackupFromFile error:", e);
+    showToast("Failed to read backup file");
+  });
+}
+
+function clearSavedData() {
+  showModal("This will remove saved data and clear all subjects. Continue?", "Clear", () => {
+    try {
+      if (isLocalStorageAvailable()) localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.error("clearSavedData error:", e);
+    }
+
+    state.subjects = [];
+    renderSubjects();
+    updateCalculator();
+    updateCreditOptions();
+    updateSaveStatus("No saved data", null);
+    showToast("Saved data cleared");
+  });
+}
+
 
 /* -------------------- View State (Phase 7) -------------------- */
 const viewState = {
@@ -1311,6 +1482,7 @@ function addSubject() {
 
   renderSubjects();
   updateCalculator();
+  saveAppData();
   updateCreditOptions();
   resetFormState();
   setStatusMessage("✓ Subject added successfully.", "info");
@@ -1375,6 +1547,7 @@ function updateSubject() {
 
   renderSubjects();
   updateCalculator();
+  saveAppData();
   updateCreditOptions();
   resetFormState();
   setStatusMessage("✓ Subject updated successfully.", "info");
@@ -1455,6 +1628,7 @@ function deleteSubject(subjectId) {
 
     renderSubjects();
     updateCalculator();
+    saveAppData();
     updateCreditOptions();
     setStatusMessage("✓ Subject deleted successfully.", "info");
     showToast(`✓ ${deletedSubject.name} deleted`, () => undoDelete());
@@ -1479,6 +1653,7 @@ function deleteAllSubjects() {
     state.pendingDeleteAll = false;
     renderSubjects();
     updateCalculator();
+    saveAppData();
     resetFormState();
     updateCreditOptions();
     resetView();
@@ -1505,6 +1680,7 @@ function undoDelete() {
   updateCalculator();
   updateCreditOptions();
   setStatusMessage("✓ Last deletion restored.", "info");
+  saveAppData();
 }
 
 function handleSubjectListClick(event) {
@@ -1646,6 +1822,36 @@ function setupEventListeners() {
     elements.modalCancelButton.addEventListener("click", hideModal);
   }
 
+  // Persistence & Backup controls (Phase 8)
+  if (elements.saveNowBtn) {
+    elements.saveNowBtn.addEventListener("click", () => {
+      saveAppData();
+    });
+  }
+
+  if (elements.exportBtn) {
+    elements.exportBtn.addEventListener("click", () => {
+      exportBackup();
+    });
+  }
+
+  if (elements.importInput) {
+    elements.importInput.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        importBackupFromFile(file);
+      }
+      // clear value so same file can be selected again if needed
+      e.target.value = "";
+    });
+  }
+
+  if (elements.clearSavedBtn) {
+    elements.clearSavedBtn.addEventListener("click", () => {
+      clearSavedData();
+    });
+  }
+
   ["subjectName", "credits", "grade"].forEach((fieldId) => {
     const field = document.getElementById(fieldId);
 
@@ -1688,11 +1894,13 @@ function setupEventListeners() {
 function initializeApp() {
   renderGradeScale();
   updateAddButtonState();
+  setupEventListeners();
+  // Load saved data (if any) before first render to avoid UI flash
+  loadAppData();
   renderSubjects();
   updateCalculator();
   updateCreditOptions();
   setStatusMessage("Add your subject details to get started.", "info");
-  setupEventListeners();
 }
 
 initializeApp();

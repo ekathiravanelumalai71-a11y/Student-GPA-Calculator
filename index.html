@@ -141,6 +141,24 @@
 
               <p id="statusMessage" class="form-status" aria-live="polite"></p>
             </form>
+            <div id="dataBackup" class="data-backup" aria-label="Data and backup">
+              <h4>Data & Backup</h4>
+              <p class="muted">Your data is stored locally in this browser. Export backups to move data between devices.</p>
+              <div class="backup-controls">
+                <button id="saveNowBtn" class="primary-button" type="button">Save Now</button>
+                <button id="exportBtn" class="secondary-button" type="button">Export Backup</button>
+                <label for="importInput" class="secondary-button" style="margin:0;">
+                  Import Backup
+                  <input id="importInput" type="file" accept="application/json" style="display:none" />
+                </label>
+                <button id="clearSavedBtn" class="danger-button" type="button">Clear Saved Data</button>
+              </div>
+
+              <div class="backup-status">
+                <span id="saveStatus" class="save-status">No saved data</span>
+                <span id="lastSaved" class="last-saved"></span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
