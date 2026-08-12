@@ -1,5 +1,22 @@
 "use strict";
 
+const GPA_CONFIG = {
+  decimalPlaces: 2,
+  minCredits: 1,
+  maxCredits: 10
+};
+
+const GRADE_POINTS = {
+  "A+": 10,
+  A: 9,
+  "B+": 8,
+  B: 7,
+  "C+": 6,
+  C: 5,
+  D: 4,
+  F: 0
+};
+
 const state = {
   subjects: [],
   searchTerm: "",
@@ -7,7 +24,8 @@ const state = {
   editingSubjectId: null,
   lastDeletedState: null,
   pendingDeleteId: null,
-  pendingDeleteAll: false
+  pendingDeleteAll: false,
+  calculationValid: true
 };
 
 const gradeOrder = {
@@ -37,6 +55,12 @@ const elements = {
   subjectCountText: document.getElementById("subjectCountText"),
   totalSubjectsValue: document.getElementById("totalSubjectsValue"),
   totalCreditsValue: document.getElementById("totalCreditsValue"),
+  totalQualityPointsValue: document.getElementById("totalQualityPointsValue"),
+  gpaValue: document.getElementById("gpaValue"),
+  gpaMeta: document.getElementById("gpaMeta"),
+  calculationStatus: document.getElementById("calculationStatus"),
+  calculationBreakdown: document.getElementById("calculationBreakdown"),
+  gradeScale: document.getElementById("gradeScale"),
   toast: document.getElementById("toast"),
   modalOverlay: document.getElementById("modalOverlay"),
   modalCancelButton: document.getElementById("modalCancelBtn"),
@@ -52,6 +76,338 @@ function setStatusMessage(message, type = "info") {
 
   elements.statusMessage.textContent = message;
   elements.statusMessage.className = `form-status ${type}`;
+}
+
+function formatGPA(value) {
+  if (!Number.isFinite(value)) {
+    return "0.00";
+  }
+
+  return Number(value).toFixed(GPA_CONFIG.decimalPlaces);
+}
+
+function getGradePoint(grade) {
+  if (!Object.prototype.hasOwnProperty.call(GRADE_POINTS, grade)) {
+    return null;
+  }
+
+  return GRADE_POINTS[grade];
+}
+
+function calculateQualityPoints(credits, gradePoint) {
+  return Number(credits) * Number(gradePoint);
+}
+
+function calculateTotalCredits(subjects) {
+  return subjects.reduce((total, subject) => {
+    const numericCredits = Number(subject?.credits);
+
+    if (!Number.isFinite(numericCredits) || numericCredits <= 0) {
+      return total;
+    }
+
+    return total + numericCredits;
+  }, 0);
+}
+
+function calculateTotalQualityPoints(subjects) {
+  return subjects.reduce((total, subject) => {
+    const gradePoint = getGradePoint(subject?.grade);
+    const numericCredits = Number(subject?.credits);
+
+    if (gradePoint === null || !Number.isFinite(numericCredits) || numericCredits <= 0) {
+      return total;
+    }
+
+    return total + calculateQualityPoints(numericCredits, gradePoint);
+  }, 0);
+}
+
+function calculateGPA(subjects) {
+  const totalCredits = calculateTotalCredits(subjects);
+  const totalQualityPoints = calculateTotalQualityPoints(subjects);
+
+  if (totalCredits === 0) {
+    return 0;
+  }
+
+  return totalQualityPoints / totalCredits;
+}
+
+function validateSubjectForCalculation(subject) {
+  if (!subject || typeof subject.name !== "string") {
+    return false;
+  }
+
+  if (subject.name.trim().length === 0) {
+    return false;
+  }
+
+  if (!Number.isFinite(Number(subject.credits)) || Number(subject.credits) <= 0) {
+    return false;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(GRADE_POINTS, subject.grade)) {
+    return false;
+  }
+
+  return true;
+}
+
+function validateSubjectsForCalculation(subjects) {
+  if (!Array.isArray(subjects)) {
+    return false;
+  }
+
+  if (subjects.length === 0) {
+    return true;
+  }
+
+  return subjects.every(validateSubjectForCalculation);
+}
+
+function calculateResults(subjects) {
+  if (!Array.isArray(subjects)) {
+    return {
+      valid: false,
+      totalCredits: 0,
+      totalQualityPoints: 0,
+      gpa: null,
+      breakdown: []
+    };
+  }
+
+  if (subjects.length === 0) {
+    return {
+      valid: true,
+      totalCredits: 0,
+      totalQualityPoints: 0,
+      gpa: 0,
+      breakdown: []
+    };
+  }
+
+  if (!validateSubjectsForCalculation(subjects)) {
+    return {
+      valid: false,
+      totalCredits: 0,
+      totalQualityPoints: 0,
+      gpa: null,
+      breakdown: []
+    };
+  }
+
+  const totalCredits = calculateTotalCredits(subjects);
+  const totalQualityPoints = calculateTotalQualityPoints(subjects);
+  const gpa = calculateGPA(subjects);
+
+  const breakdown = subjects.map((subject, index) => {
+    const gradePoint = getGradePoint(subject.grade);
+    const qualityPoints = calculateQualityPoints(Number(subject.credits), gradePoint);
+
+    return {
+      id: subject.id,
+      no: index + 1,
+      name: subject.name,
+      credits: Number(subject.credits),
+      grade: subject.grade,
+      gradePoint,
+      qualityPoints
+    };
+  });
+
+  return {
+    valid: true,
+    totalCredits,
+    totalQualityPoints,
+    gpa,
+    breakdown
+  };
+}
+
+function renderGradeScale() {
+  if (!elements.gradeScale) {
+    return;
+  }
+
+  const entries = Object.entries(GRADE_POINTS)
+    .slice()
+    .sort((left, right) => {
+      return Number(right[1]) - Number(left[1]);
+    });
+
+  elements.gradeScale.innerHTML = "";
+
+  entries.forEach(([grade, gradePoint]) => {
+    const item = document.createElement("div");
+    item.className = "grade-item";
+
+    const label = document.createElement("span");
+    label.className = "grade-label";
+    label.textContent = `${grade}`;
+
+    const point = document.createElement("span");
+    point.className = "grade-point";
+    point.textContent = String(gradePoint);
+
+    item.append(label, point);
+    elements.gradeScale.appendChild(item);
+  });
+}
+
+function renderCalculationBreakdown(results) {
+  if (!elements.calculationBreakdown) {
+    return;
+  }
+
+  elements.calculationBreakdown.innerHTML = "";
+
+  if (!results.valid) {
+    const invalidState = document.createElement("div");
+    invalidState.className = "calculation-invalid-state";
+
+    const title = document.createElement("strong");
+    title.textContent = "Complete all subject details before calculating GPA.";
+
+    const message = document.createElement("span");
+    message.textContent = "Each subject must have a valid name, credit value, and grade.";
+
+    invalidState.append(title, message);
+    elements.calculationBreakdown.appendChild(invalidState);
+    return;
+  }
+
+  if (results.breakdown.length === 0) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "calculation-empty-state";
+
+    const title = document.createElement("strong");
+    title.textContent = "No subjects available for calculation.";
+
+    const message = document.createElement("span");
+    message.textContent = "Add subjects above to calculate your GPA.";
+
+    emptyState.append(title, message);
+    elements.calculationBreakdown.appendChild(emptyState);
+    return;
+  }
+
+  const table = document.createElement("table");
+  table.className = "calculation-table";
+
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th scope="col">No.</th>
+        <th scope="col">Subject</th>
+        <th scope="col" class="numeric">Credits</th>
+        <th scope="col" class="numeric">Grade</th>
+        <th scope="col" class="numeric">Grade Point</th>
+        <th scope="col" class="numeric">Quality Points</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  const tbody = table.querySelector("tbody");
+
+  results.breakdown.forEach((entry) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${entry.no}</td>
+      <td>${entry.name}</td>
+      <td class="numeric">${entry.credits}</td>
+      <td class="numeric">${entry.grade}</td>
+      <td class="numeric">${entry.gradePoint}</td>
+      <td class="numeric">${entry.qualityPoints}</td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  const totalsRow = document.createElement("tr");
+  totalsRow.innerHTML = `
+    <td colspan="2"><strong>Total</strong></td>
+    <td class="numeric"><strong>${results.totalCredits}</strong></td>
+    <td class="numeric"><strong>—</strong></td>
+    <td class="numeric"><strong>—</strong></td>
+    <td class="numeric"><strong>${results.totalQualityPoints}</strong></td>
+  `;
+  tbody.appendChild(totalsRow);
+
+  elements.calculationBreakdown.appendChild(table);
+
+  const mobileList = document.createElement("div");
+  mobileList.className = "calculation-mobile-list";
+
+  results.breakdown.forEach((entry) => {
+    const card = document.createElement("div");
+    card.className = "breakdown-card";
+
+    const title = document.createElement("strong");
+    title.textContent = entry.name;
+
+    const details = document.createElement("p");
+    details.textContent = `Credits: ${entry.credits} | Grade: ${entry.grade} | Grade Point: ${entry.gradePoint} | Quality Points: ${entry.qualityPoints}`;
+
+    card.append(title, details);
+    mobileList.appendChild(card);
+  });
+
+  elements.calculationBreakdown.appendChild(mobileList);
+}
+
+function renderResults(results) {
+  const totalSubjects = state.subjects.length;
+  const totalCredits = Number(results.totalCredits || 0);
+  const totalQualityPoints = Number(results.totalQualityPoints || 0);
+
+  if (elements.totalSubjectsValue) {
+    elements.totalSubjectsValue.textContent = String(totalSubjects);
+  }
+
+  if (elements.totalCreditsValue) {
+    elements.totalCreditsValue.textContent = String(totalCredits);
+  }
+
+  if (elements.totalQualityPointsValue) {
+    elements.totalQualityPointsValue.textContent = String(totalQualityPoints);
+  }
+
+  if (elements.gpaValue) {
+    if (!results.valid || results.gpa === null) {
+      elements.gpaValue.textContent = "—";
+    } else {
+      elements.gpaValue.textContent = formatGPA(results.gpa);
+    }
+  }
+
+  if (elements.gpaMeta) {
+    if (totalSubjects === 0) {
+      elements.gpaMeta.textContent = "No subjects available";
+    } else if (!results.valid || results.gpa === null) {
+      elements.gpaMeta.textContent = "Complete all subject details";
+    } else {
+      elements.gpaMeta.textContent = `Calculated from ${totalSubjects} subject${totalSubjects === 1 ? "" : "s"}`;
+    }
+  }
+
+  if (elements.calculationStatus) {
+    if (totalSubjects === 0) {
+      elements.calculationStatus.textContent = "No subjects available for calculation.";
+    } else if (!results.valid || results.gpa === null) {
+      elements.calculationStatus.textContent = "Complete all subject details to calculate GPA.";
+    } else {
+      elements.calculationStatus.textContent = `Total Quality Points = ${results.totalQualityPoints}; Total Credits = ${results.totalCredits}; GPA = ${formatGPA(results.gpa)}.`;
+    }
+  }
+
+  renderCalculationBreakdown(results);
+}
+
+function updateCalculator() {
+  const results = calculateResults(state.subjects);
+  state.calculationValid = results.valid;
+  renderResults(results);
 }
 
 function clearErrors() {
@@ -188,14 +544,9 @@ function validateForm() {
 function normalizeSubjectName(value) {
   return value.trim().replace(/\s+/g, " ");
 }
-
-function calculateTotalCredits() {
-  return state.subjects.reduce((total, subject) => total + Number(subject.credits), 0);
-}
-
 function updateSummary() {
   const totalSubjects = state.subjects.length;
-  const totalCredits = calculateTotalCredits();
+  const totalCredits = calculateTotalCredits(state.subjects);
 
   if (elements.totalSubjectsValue) {
     elements.totalSubjectsValue.textContent = String(totalSubjects);
@@ -446,6 +797,7 @@ function addSubject() {
   state.subjects.push(newSubject);
 
   renderSubjects();
+  updateCalculator();
   resetFormState();
   setStatusMessage("✓ Subject added successfully.", "info");
   showToast(`✓ ${newSubject.name} added successfully`);
@@ -508,6 +860,7 @@ function updateSubject() {
   subject.grade = elements.grade.value;
 
   renderSubjects();
+  updateCalculator();
   resetFormState();
   setStatusMessage("✓ Subject updated successfully.", "info");
   showToast(`✓ ${subjectName} updated successfully`);
@@ -586,6 +939,7 @@ function deleteSubject(subjectId) {
     state.pendingDeleteId = null;
 
     renderSubjects();
+    updateCalculator();
     setStatusMessage("✓ Subject deleted successfully.", "info");
     showToast(`✓ ${deletedSubject.name} deleted`, () => undoDelete());
   });
@@ -608,6 +962,7 @@ function deleteAllSubjects() {
     state.subjects = [];
     state.pendingDeleteAll = false;
     renderSubjects();
+    updateCalculator();
     resetFormState();
     setStatusMessage("✓ All subjects deleted successfully.", "info");
     showToast("✓ All subjects deleted", () => undoDelete());
@@ -629,6 +984,7 @@ function undoDelete() {
 
   state.lastDeletedState = null;
   renderSubjects();
+  updateCalculator();
   setStatusMessage("✓ Last deletion restored.", "info");
 }
 
@@ -673,7 +1029,10 @@ function setupEventListeners() {
   }
 
   if (elements.calculateButton) {
-    elements.calculateButton.addEventListener("click", handleCalculateButton);
+    elements.calculateButton.addEventListener("click", () => {
+      updateCalculator();
+      setStatusMessage("GPA updated successfully.", "info");
+    });
   }
 
   if (elements.subjectList) {
@@ -744,8 +1103,10 @@ function setupEventListeners() {
 }
 
 function initializeApp() {
+  renderGradeScale();
   updateAddButtonState();
   renderSubjects();
+  updateCalculator();
   setStatusMessage("Add your subject details to get started.", "info");
   setupEventListeners();
 }

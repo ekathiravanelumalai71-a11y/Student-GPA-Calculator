@@ -183,7 +183,7 @@
             <article class="result-card result-card-primary">
               <p class="card-label">GPA</p>
               <strong id="gpaValue" class="result-value">0.00</strong>
-              <span class="mini-text">Current GPA</span>
+              <span id="gpaMeta" class="mini-text">No subjects available</span>
             </article>
 
             <article class="result-card">
@@ -195,6 +195,33 @@
               <p class="card-label">Total Credits</p>
               <strong id="totalCreditsValue" class="result-value small">0</strong>
             </article>
+
+            <article class="result-card">
+              <p class="card-label">Quality Points</p>
+              <strong id="totalQualityPointsValue" class="result-value small">0</strong>
+            </article>
+          </div>
+
+          <div class="calculation-layout">
+            <section class="calculation-panel" aria-live="polite">
+              <div class="panel-header">
+                <h3>GPA Calculation</h3>
+              </div>
+              <p id="calculationStatus" class="calculation-status">
+                Add subjects to calculate your GPA.
+              </p>
+              <div id="calculationBreakdown" class="calculation-breakdown"></div>
+            </section>
+
+            <aside class="calculation-panel">
+              <div class="panel-header">
+                <h3>GPA Formula</h3>
+              </div>
+              <p class="gpa-formula">GPA = Total Quality Points ÷ Total Credits</p>
+              <p class="formula-explainer">Weighted average based on subject credits.</p>
+              <div class="grade-scale-header">Grade Scale</div>
+              <div id="gradeScale" class="grade-scale" aria-label="Grade scale"></div>
+            </aside>
           </div>
         </div>
       </section>
